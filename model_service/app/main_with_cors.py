@@ -25,19 +25,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ── Add CORS middleware here ──
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# Templates للـ Dashboard
 templates = Jinja2Templates(directory="model_service/app/templates")
 
 # تشغيل DB عند بدء السيرفر
