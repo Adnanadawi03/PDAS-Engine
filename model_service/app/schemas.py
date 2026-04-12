@@ -1,3 +1,7 @@
+from pydantic import BaseModel
+
+class URLScanRequest(BaseModel):
+    url: str
 class ScanResult(BaseModel):
     score: float
     verdict: str
