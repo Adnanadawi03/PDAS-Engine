@@ -1,20 +1,16 @@
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, UploadFile, File, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.routing import APIRoute
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, UploadFile, File
 from .schemas import URLScanRequest, ScanResult
 from .utils.url_features import extract_url_features
 from .utils.file_features import sniff_type_and_features
 from ..models.url.ai_model import predict_proba as url_predict
 from ..models.file.ai_model import predict_proba as file_predict
 from ..rules.rules import rule_score_url, rule_score_file
-from fastapi.routing import APIRoute
 from .database import SessionLocal, init_db, ScanEvent
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -28,12 +24,10 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory="model_service/app/templates")
 
-# تشغيل DB عند بدء السيرفر
 @app.on_event("startup")
 def startup():
     init_db()
 
-# Dependency لفتح/إغلاق جلسة DB
 def get_db():
     db = SessionLocal()
     try:
@@ -60,7 +54,6 @@ async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db))
     final = combine_scores(r_score, p)
     verdict = decide(final)
 
-    # تخزين النتيجة في DB
     event = ScanEvent(
         type="file",
         target=file.filename,
@@ -71,7 +64,7 @@ async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db))
     db.add(event)
     db.commit()
 
-    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals})
+    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals}, target=file.filename)
 
 @app.post("/scan/url", response_model=ScanResult)
 def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
@@ -82,7 +75,6 @@ def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
     final = combine_scores(r_score, p)
     verdict = decide(final)
 
-    # تخزين النتيجة في DB
     event = ScanEvent(
         type="url",
         target=url,
@@ -93,9 +85,8 @@ def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
     db.add(event)
     db.commit()
 
-    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals})
+    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals}, target=url)
 
-# Endpoint جديد يرجع آخر النتائج كـ JSON
 @app.get("/events")
 def get_events(limit: int = 20, db: Session = Depends(get_db)):
     events = db.query(ScanEvent).order_by(ScanEvent.timestamp.desc()).limit(limit).all()
@@ -111,7 +102,6 @@ def get_events(limit: int = 20, db: Session = Depends(get_db)):
         for e in events
     ]
 
-# Dashboard HTML
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
