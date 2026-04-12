@@ -12,12 +12,19 @@ from ..models.file.ai_model import predict_proba as file_predict
 from ..rules.rules import rule_score_url, rule_score_file
 from fastapi.routing import APIRoute
 from .database import SessionLocal, init_db, ScanEvent
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # ── Add CORS middleware here ──
 app.add_middleware(
     CORSMiddleware,
