@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "PDAS Web Guard",
+  "version": "1.0",
+  "description": "يفحص الروابط والتنزيلات باستخدام PDAS Agent",
+  "permissions": ["downloads", "webRequest", "webNavigation", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "PDAS Web Guard"
+  }
+}

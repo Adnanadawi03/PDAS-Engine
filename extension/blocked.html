@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>تم الحظر بواسطة PDAS</title>
+  </head>
+  <body style="font-family:sans-serif; text-align:center; margin-top:50px;">
+    <h1 style="color:red;">⚠️ تم منع الدخول لهذا الرابط</h1>
+    <p id="url"></p>
+    <script>
+      const params = new URLSearchParams(location.search);
+      document.getElementById("url").innerText = params.get("url");
+    </script>
+  </body>
+</html>

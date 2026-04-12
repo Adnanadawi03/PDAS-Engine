@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:type="MailApp">
+    <Id>f8b6d9c1-0000-4abc-9f12-EXAMPLEID0000</Id>
+    <Version>1.0.0.0</Version>
+    <ProviderName>PDAS Labs</ProviderName>
+    <DefaultLocale>en-US</DefaultLocale>
+    <DisplayName DefaultValue="PDAS Mail Guard"/>
+    <Description DefaultValue="Inspect links & attachments with PDAS"/>
+    <IconUrl DefaultValue="https://localhost/assets/icon-32.png"/>
+    <HighResolutionIconUrl DefaultValue="https://localhost/assets/icon-64.png"/>
+
+    <Hosts>
+        <Host Name="Mailbox"/>
+    </Hosts>
+
+    <Requirements>
+        <Sets DefaultMinVersion="1.1">
+            <Set Name="Mailbox"/>
+        </Sets>
+    </Requirements>
+
+    <FormSettings>
+        <Form xsi:type="ItemRead">
+            <DesktopSettings>
+                <SourceLocation DefaultValue="https://3903512bf446.ngrok-free.app/taskpane.html"/>
+                <RequestedHeight>250</RequestedHeight>
+            </DesktopSettings>
+        </Form>
+    </FormSettings>
+
+    <Permissions>ReadWriteMailbox</Permissions>
+
+    <Rule xsi:type="RuleCollection" Mode="Or">
+        <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+    </Rule>
+
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.0">
+        <!-- optional modern overrides omitted for brevity -->
+    </VersionOverrides>
+</OfficeApp>
