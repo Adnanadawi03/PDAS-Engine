@@ -2,5 +2,5 @@ fastapi==0.111.0
 uvicorn==0.29.0
 python-multipart==0.0.9
 sqlalchemy==2.0.30
-scikit-learn==1.4.2
-numpy==1.26.4
+numpy==2.2.5        # was numpy==2.0.0rc1 (yanked from PyPI)
+scikit-learn==1.6.1 # was 1.4.2 (no wheel for Python 3.14)
