@@ -21,17 +21,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+# Templates للـ Dashboard
 templates = Jinja2Templates(directory="model_service/app/templates")
 
+# تشغيل DB عند بدء السيرفر
 @app.on_event("startup")
 def startup():
     init_db()
 
-@app.on_event("startup")
-async def _print_routes():
-    print("ROUTES_AT_STARTUP:", [r.path for r in app.routes if isinstance(r, APIRoute)])
-
+# Dependency لفتح/إغلاق جلسة DB
 def get_db():
     db = SessionLocal()
     try:
@@ -49,55 +47,6 @@ def decide(score: float, warn=50, block=80) -> str:
         return "warn"
     return "allow"
 
-def get_risk(score: float) -> tuple:
-    """Return (risk_level, risk_label) based on score."""
-    if score >= 80:
-        return "CRITICAL", "🔴 Critical Risk – Do not proceed"
-    if score >= 65:
-        return "HIGH",     "🟠 High Risk – Likely malicious"
-    if score >= 50:
-        return "MEDIUM",   "🟡 Medium Risk – Suspicious content"
-    if score >= 30:
-        return "LOW",      "🟢 Low Risk – Minor concerns"
-    return     "SAFE",     "✅ Safe – No threats detected"
-
-@app.get("/")
-def root():
-    return {"status": "ok", "service": "PDAS Model Service", "docs": "/docs"}
-
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
-
-@app.post("/scan/url", response_model=ScanResult)
-def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
-    url = str(req.url)
-    feats = extract_url_features(url)
-    p = url_predict(feats)
-    r_score, r_signals = rule_score_url(url)
-    final = combine_scores(r_score, p)
-    verdict = decide(final)
-    risk_level, risk_label = get_risk(final)
-
-    event = ScanEvent(
-        type="url",
-        target=url,
-        verdict=verdict,
-        score=final,
-        signals={"features": feats, "rules": r_signals}
-    )
-    db.add(event)
-    db.commit()
-
-    return ScanResult(
-        score=final,
-        verdict=verdict,
-        risk_level=risk_level,
-        risk_label=risk_label,
-        signals={"features": feats, "rules": r_signals},
-        target=url
-    )
-
 @app.post("/scan/file", response_model=ScanResult)
 async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     data = await file.read()
@@ -106,8 +55,8 @@ async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db))
     r_score, r_signals = rule_score_file(feats)
     final = combine_scores(r_score, p)
     verdict = decide(final)
-    risk_level, risk_label = get_risk(final)
 
+    # تخزين النتيجة في DB
     event = ScanEvent(
         type="file",
         target=file.filename,
@@ -118,15 +67,31 @@ async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db))
     db.add(event)
     db.commit()
 
-    return ScanResult(
-        score=final,
-        verdict=verdict,
-        risk_level=risk_level,
-        risk_label=risk_label,
-        signals={"features": feats, "rules": r_signals},
-        target=file.filename
-    )
+    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals})
 
+@app.post("/scan/url", response_model=ScanResult)
+def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
+    url = str(req.url)
+    feats = extract_url_features(url)
+    p = url_predict(feats)
+    r_score, r_signals = rule_score_url(url)
+    final = combine_scores(r_score, p)
+    verdict = decide(final)
+
+    # تخزين النتيجة في DB
+    event = ScanEvent(
+        type="url",
+        target=url,
+        verdict=verdict,
+        score=final,
+        signals={"features": feats, "rules": r_signals}
+    )
+    db.add(event)
+    db.commit()
+
+    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals})
+
+# Endpoint جديد يرجع آخر النتائج كـ JSON
 @app.get("/events")
 def get_events(limit: int = 20, db: Session = Depends(get_db)):
     events = db.query(ScanEvent).order_by(ScanEvent.timestamp.desc()).limit(limit).all()
@@ -142,6 +107,19 @@ def get_events(limit: int = 20, db: Session = Depends(get_db)):
         for e in events
     ]
 
+# Dashboard HTML
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "PDAS Model Service", "docs": "/docs"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.on_event("startup")
+async def _print_routes():
+    print("ROUTES_AT_STARTUP:", [r.path for r in app.routes if isinstance(r, APIRoute)])
