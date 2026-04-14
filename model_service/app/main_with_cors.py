@@ -12,7 +12,7 @@ from ..models.file.ai_model import predict_proba as file_predict
 from ..rules.rules import rule_score_url, rule_score_file
 from .database import SessionLocal, init_db, ScanEvent
 
-app = FastAPI()
+app = FastAPI(title="PDAS Model Service", version="0.5")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,6 +27,10 @@ templates = Jinja2Templates(directory="model_service/app/templates")
 @app.on_event("startup")
 def startup():
     init_db()
+
+@app.on_event("startup")
+async def _print_routes():
+    print("ROUTES_AT_STARTUP:", [r.path for r in app.routes if isinstance(r, APIRoute)])
 
 def get_db():
     db = SessionLocal()
@@ -45,26 +49,25 @@ def decide(score: float, warn=50, block=80) -> str:
         return "warn"
     return "allow"
 
-@app.post("/scan/file", response_model=ScanResult)
-async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    data = await file.read()
-    ftype, feats = sniff_type_and_features(data, file.filename)
-    p = file_predict(feats)
-    r_score, r_signals = rule_score_file(feats)
-    final = combine_scores(r_score, p)
-    verdict = decide(final)
+def get_risk(score: float) -> tuple:
+    """Return (risk_level, risk_label) based on score."""
+    if score >= 80:
+        return "CRITICAL", "🔴 Critical Risk – Do not proceed"
+    if score >= 65:
+        return "HIGH",     "🟠 High Risk – Likely malicious"
+    if score >= 50:
+        return "MEDIUM",   "🟡 Medium Risk – Suspicious content"
+    if score >= 30:
+        return "LOW",      "🟢 Low Risk – Minor concerns"
+    return     "SAFE",     "✅ Safe – No threats detected"
 
-    event = ScanEvent(
-        type="file",
-        target=file.filename,
-        verdict=verdict,
-        score=final,
-        signals={"features": feats, "rules": r_signals}
-    )
-    db.add(event)
-    db.commit()
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "PDAS Model Service", "docs": "/docs"}
 
-    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals}, target=file.filename)
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 
 @app.post("/scan/url", response_model=ScanResult)
 def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
@@ -74,6 +77,7 @@ def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
     r_score, r_signals = rule_score_url(url)
     final = combine_scores(r_score, p)
     verdict = decide(final)
+    risk_level, risk_label = get_risk(final)
 
     event = ScanEvent(
         type="url",
@@ -85,7 +89,43 @@ def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
     db.add(event)
     db.commit()
 
-    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals}, target=url)
+    return ScanResult(
+        score=final,
+        verdict=verdict,
+        risk_level=risk_level,
+        risk_label=risk_label,
+        signals={"features": feats, "rules": r_signals},
+        target=url
+    )
+
+@app.post("/scan/file", response_model=ScanResult)
+async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    data = await file.read()
+    ftype, feats = sniff_type_and_features(data, file.filename)
+    p = file_predict(feats)
+    r_score, r_signals = rule_score_file(feats)
+    final = combine_scores(r_score, p)
+    verdict = decide(final)
+    risk_level, risk_label = get_risk(final)
+
+    event = ScanEvent(
+        type="file",
+        target=file.filename,
+        verdict=verdict,
+        score=final,
+        signals={"features": feats, "rules": r_signals}
+    )
+    db.add(event)
+    db.commit()
+
+    return ScanResult(
+        score=final,
+        verdict=verdict,
+        risk_level=risk_level,
+        risk_label=risk_label,
+        signals={"features": feats, "rules": r_signals},
+        target=file.filename
+    )
 
 @app.get("/events")
 def get_events(limit: int = 20, db: Session = Depends(get_db)):
@@ -105,15 +145,3 @@ def get_events(limit: int = 20, db: Session = Depends(get_db)):
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
-
-@app.get("/")
-def root():
-    return {"status": "ok", "service": "PDAS Model Service", "docs": "/docs"}
-
-@app.get("/health")
-def health():
-    return {"status": "healthy"}
-
-@app.on_event("startup")
-async def _print_routes():
-    print("ROUTES_AT_STARTUP:", [r.path for r in app.routes if isinstance(r, APIRoute)])
