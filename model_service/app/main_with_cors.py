@@ -11,7 +11,30 @@ from ..models.url.ai_model import predict_proba as url_predict
 from ..models.file.ai_model import predict_proba as file_predict
 from ..rules.rules import rule_score_url, rule_score_file
 from .database import SessionLocal, init_db, ScanEvent
+import traceback, logging
 
+logging.basicConfig(level=logging.ERROR)
+
+@app.post("/scan/url")
+def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
+    try:
+        url = str(req.url)
+        feats = extract_url_features(url)
+        p = url_predict(feats)
+        r_score, r_signals = rule_score_url(url)
+        final = combine_scores(r_score, p)
+        verdict = decide(final)
+        event = ScanEvent(
+            type="url", target=url, verdict=verdict,
+            score=final, signals={"features": feats, "rules": r_signals}
+        )
+        db.add(event)
+        db.commit()
+        return ScanResult(score=final, verdict=verdict,
+                         signals={"features": feats, "rules": r_signals})
+    except Exception as e:
+        logging.error("SCAN_URL_ERROR: %s\n%s", e, traceback.format_exc())
+        return {"error": str(e), "trace": traceback.format_exc()}
 app = FastAPI(title="PDAS Model Service", version="0.5")
 
 app.add_middleware(
