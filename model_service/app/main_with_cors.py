@@ -11,11 +11,8 @@ from ..models.url.ai_model import predict_proba as url_predict
 from ..models.file.ai_model import predict_proba as file_predict
 from ..rules.rules import rule_score_url, rule_score_file
 from .database import SessionLocal, init_db, ScanEvent
-import traceback, logging
 
-logging.basicConfig(level=logging.ERROR)
-
-app = FastAPI(title="PDAS Model Service", version="0.5")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,10 +27,6 @@ templates = Jinja2Templates(directory="model_service/app/templates")
 @app.on_event("startup")
 def startup():
     init_db()
-
-@app.on_event("startup")
-async def _print_routes():
-    print("ROUTES_AT_STARTUP:", [r.path for r in app.routes if isinstance(r, APIRoute)])
 
 def get_db():
     db = SessionLocal()
@@ -54,50 +47,58 @@ def decide(score: float, warn=50, block=80) -> str:
 
 @app.post("/scan/file", response_model=ScanResult)
 async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    try:
-        data = await file.read()
-        ftype, feats = sniff_type_and_features(data, file.filename)
-        p = file_predict(feats)
-        r_score, r_signals = rule_score_file(feats)
-        final = combine_scores(r_score, p)
-        verdict = decide(final)
-        event = ScanEvent(
-            type="file", target=file.filename, verdict=verdict,
-            score=final, signals={"features": feats, "rules": r_signals}
-        )
-        db.add(event)
-        db.commit()
-        return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals})
-    except Exception as e:
-        logging.error("SCAN_FILE_ERROR: %s\n%s", e, traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
+    data = await file.read()
+    ftype, feats = sniff_type_and_features(data, file.filename)
+    p = file_predict(feats)
+    r_score, r_signals = rule_score_file(feats)
+    final = combine_scores(r_score, p)
+    verdict = decide(final)
+
+    event = ScanEvent(
+        type="file",
+        target=file.filename,
+        verdict=verdict,
+        score=final,
+        signals={"features": feats, "rules": r_signals}
+    )
+    db.add(event)
+    db.commit()
+
+    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals}, target=file.filename)
 
 @app.post("/scan/url", response_model=ScanResult)
 def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
-    try:
-        url = str(req.url)
-        feats = extract_url_features(url)
-        p = url_predict(feats)
-        r_score, r_signals = rule_score_url(url)
-        final = combine_scores(r_score, p)
-        verdict = decide(final)
-        event = ScanEvent(
-            type="url", target=url, verdict=verdict,
-            score=final, signals={"features": feats, "rules": r_signals}
-        )
-        db.add(event)
-        db.commit()
-        return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals})
-    except Exception as e:
-        logging.error("SCAN_URL_ERROR: %s\n%s", e, traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
+    url = str(req.url)
+    feats = extract_url_features(url)
+    p = url_predict(feats)
+    r_score, r_signals = rule_score_url(url)
+    final = combine_scores(r_score, p)
+    verdict = decide(final)
+
+    event = ScanEvent(
+        type="url",
+        target=url,
+        verdict=verdict,
+        score=final,
+        signals={"features": feats, "rules": r_signals}
+    )
+    db.add(event)
+    db.commit()
+
+    return ScanResult(score=final, verdict=verdict, signals={"features": feats, "rules": r_signals}, target=url)
 
 @app.get("/events")
 def get_events(limit: int = 20, db: Session = Depends(get_db)):
     events = db.query(ScanEvent).order_by(ScanEvent.timestamp.desc()).limit(limit).all()
     return [
-        {"id": e.id, "type": e.type, "target": e.target,
-         "verdict": e.verdict, "score": e.score, "timestamp": e.timestamp}
+        {
+            "id": e.id,
+            "type": e.type,
+            "target": e.target,
+            "verdict": e.verdict,
+            "score": e.score,
+            "timestamp": e.timestamp,
+        }
         for e in events
     ]
 
@@ -112,3 +113,7 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+@app.on_event("startup")
+async def _print_routes():
+    print("ROUTES_AT_STARTUP:", [r.path for r in app.routes if isinstance(r, APIRoute)])
