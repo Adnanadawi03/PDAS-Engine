@@ -15,7 +15,6 @@ import traceback, logging
 
 logging.basicConfig(level=logging.ERROR)
 
-# ✅ app must be created FIRST before anything uses it
 app = FastAPI(title="PDAS Model Service", version="0.5")
 
 app.add_middleware(
@@ -73,7 +72,6 @@ async def scan_file(file: UploadFile = File(...), db: Session = Depends(get_db))
         logging.error("SCAN_FILE_ERROR: %s\n%s", e, traceback.format_exc())
         return {"error": str(e), "trace": traceback.format_exc()}
 
-# ✅ Only ONE /scan/url definition
 @app.post("/scan/url", response_model=ScanResult)
 def scan_url(req: URLScanRequest, db: Session = Depends(get_db)):
     try:
