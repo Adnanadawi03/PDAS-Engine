@@ -25,8 +25,9 @@ def sniff_type_and_features(file_bytes: bytes, filename: str) -> Tuple[str, Dict
         features["pdf_has_openaction"] = (b"/OpenAction" in file_bytes) or (b"/AA" in file_bytes)
     elif file_bytes.startswith(b"MZ"):
         ftype = "pe"
-        for s in (b"powershell", b"cmd.exe", b"rundll32", b"CreateRemoteThread"):
-            features[f"pe_str_{s.decode('latin1')}"] = (s in file_bytes)
+        for raw, name in ((b"powershell", "powershell"), (b"cmd.exe", "cmd_exe"),
+                          (b"rundll32", "rundll32"), (b"CreateRemoteThread", "CreateRemoteThread")):
+            features[f"pe_str_{name}"] = int(raw in file_bytes)
     elif file_bytes.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"):
         ftype = "ole"
         features["has_macros"] = True
@@ -44,4 +45,6 @@ def sniff_type_and_features(file_bytes: bytes, filename: str) -> Tuple[str, Dict
         ftype = "other"
 
     features["type"] = ftype
+    for t in ("pe", "pdf", "ole", "ooxml", "other"):
+        features[f"is_{t}"] = int(ftype == t)
     return ftype, features
