@@ -39,6 +39,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 logger = logging.getLogger("pdas.model_service")
 
 if not logger.handlers:
