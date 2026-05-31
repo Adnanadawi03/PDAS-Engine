@@ -40,9 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
 logger = logging.getLogger("pdas.model_service")
 
 if not logger.handlers:
@@ -201,8 +198,6 @@ def apply_url_score_adjustments(url: str, combined_score: float, ai_probability:
             "reason": "no explicit rule signals matched",
         })
 
-    # AI can warn without rule evidence, but cannot block on its own.
-    # Blocking requires at least one explicit rule signal as corroborating evidence.
     if not non_trust_signals and adjusted_score >= settings.url_block_threshold:
         capped = settings.url_block_threshold - 1.0
         delta = round(capped - adjusted_score, 1)
@@ -465,6 +460,7 @@ def dashboard(request: Request):
 def root():
     return {"status": "ok", "service": "PDAS Model Service", "docs": "/docs"}
 
+# ── Single /health route ──
 @app.get("/health")
 def health():
     settings = get_settings()
