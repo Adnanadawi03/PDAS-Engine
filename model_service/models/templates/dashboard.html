@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>PDAS Dashboard</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f9f9f9; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; background: #fff; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #eee; }
+        tr:nth-child(even) { background: #f2f2f2; }
+        .allow { color: green; font-weight: bold; }
+        .warn { color: orange; font-weight: bold; }
+        .block { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>📊 PDAS Dashboard</h1>
+    <p>آخر عمليات الفحص</p>
+
+    <table id="eventsTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>النوع</th>
+                <th>المستهدف</th>
+                <th>النتيجة</th>
+                <th>الدرجة</th>
+                <th>التاريخ</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        async function loadEvents() {
+            try {
+                const resp = await fetch("/events?limit=50");
+                const data = await resp.json();
+                const tbody = document.querySelector("#eventsTable tbody");
+                tbody.innerHTML = "";
+                data.forEach(e => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${e.id}</td>
+                        <td>${e.type}</td>
+                        <td>${e.target}</td>
+                        <td class="${e.verdict}">${e.verdict}</td>
+                        <td>${e.score}</td>
+                        <td>${new Date(e.timestamp).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error loading events:", err);
+            }
+        }
+        loadEvents();
+        setInterval(loadEvents, 5000); // يحدث كل 5 ثواني
+    </script>
+</body>
+</html>
