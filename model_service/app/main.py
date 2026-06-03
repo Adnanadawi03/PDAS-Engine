@@ -6,7 +6,6 @@ from fastapi import FastAPI, UploadFile, File, Depends, Header, HTTPException, R
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -30,16 +29,6 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="PDAS Model Service", version="1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# ── CORS — must be before any other middleware ──
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 logger = logging.getLogger("pdas.model_service")
 
 if not logger.handlers:
@@ -198,6 +187,8 @@ def apply_url_score_adjustments(url: str, combined_score: float, ai_probability:
             "reason": "no explicit rule signals matched",
         })
 
+    # AI can warn without rule evidence, but cannot block on its own.
+    # Blocking requires at least one explicit rule signal as corroborating evidence.
     if not non_trust_signals and adjusted_score >= settings.url_block_threshold:
         capped = settings.url_block_threshold - 1.0
         delta = round(capped - adjusted_score, 1)
@@ -460,7 +451,6 @@ def dashboard(request: Request):
 def root():
     return {"status": "ok", "service": "PDAS Model Service", "docs": "/docs"}
 
-# ── Single /health route ──
 @app.get("/health")
 def health():
     settings = get_settings()

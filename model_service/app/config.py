@@ -119,7 +119,7 @@ def get_settings() -> Settings:
     api_keys = _read_csv("PDAS_API_KEYS")
     return Settings(
         environment=environment,
-        require_api_key=_read_bool("PDAS_REQUIRE_API_KEY", False),
+        require_api_key=_read_bool("PDAS_REQUIRE_API_KEY", environment == "production"),
         api_keys=api_keys,
         url_policy_version=os.getenv("PDAS_URL_POLICY_VERSION", "url-api-v1").strip() or "url-api-v1",
         expose_model_diagnostics=_read_bool("PDAS_EXPOSE_MODEL_DIAGNOSTICS", debug_mode),
